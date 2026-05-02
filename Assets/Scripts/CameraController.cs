@@ -36,8 +36,8 @@ public class CameraController : MonoBehaviour
     void HandleRotation()
     {
         Vector2 mouse = Mouse.current.delta.ReadValue();
-        rotY += mouse.x * sensitivityX;
-        rotX -= mouse.y * sensitivityY;
+        rotY += mouse.x * sensitivityX * 0.1f;
+        rotX -= mouse.y * sensitivityY * 0.1f;
         rotX = Mathf.Clamp(rotX, minY, maxY);
         transform.rotation = Quaternion.Euler(rotX, rotY, 0f);
     }
