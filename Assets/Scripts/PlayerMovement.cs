@@ -14,6 +14,10 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float acceleration = 15f;
     [SerializeField] private float deceleration = 20f;
 
+    [Header("Velocidad Direccional")]
+    [SerializeField] private float backwardSpeedFactor = 0.6f;  // S = 60% de la velocidad
+    [SerializeField] private float sidewaysSpeedFactor = 0.7f;  // A/D = 70% de la velocidad
+
     // ─────────────────────────────────────────
     //  JUMP
     // ─────────────────────────────────────────
@@ -21,7 +25,16 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float jumpForce = 8f;
     [SerializeField] private float gravityMultiplier = 3f;
     [SerializeField] private float coyoteTime = 0.15f;
-    [SerializeField] private float airControl = 0.6f;   // 0 = sin control, 1 = control total
+    [SerializeField] private float airControl = 0.6f;
+
+    // ─────────────────────────────────────────
+    //  GRAVEDAD PROGRESIVA
+    // ─────────────────────────────────────────
+    [Header("Gravedad progresiva")]
+    [SerializeField] private float maxGravityMultiplier = 8f;
+    [SerializeField] private float gravityBuildSpeed = 4f;
+
+    private float currentGravity = 0f;
 
     // ─────────────────────────────────────────
     //  DASH
@@ -35,7 +48,7 @@ public class PlayerMovement : MonoBehaviour
     //  TRAIL (estela)
     // ─────────────────────────────────────────
     [Header("Dash Trail")]
-    [SerializeField] private float trailTime = 0.25f;   // duración de la estela
+    [SerializeField] private float trailTime = 0.25f;
     [SerializeField] private float trailWidth = 0.3f;
 
     // ─────────────────────────────────────────
@@ -68,12 +81,13 @@ public class PlayerMovement : MonoBehaviour
     private bool isDashing;
     private float dashCooldownTimer;
 
+    private DashCooldownUI dashUI;
+
     // Colores por estado
     private static readonly Color colorIdle = Color.green;
     private static readonly Color colorMove = Color.yellow;
     private static readonly Color colorSprint = Color.red;
     private static readonly Color colorDash = Color.red;
-    private static readonly Color colorDefault = Color.green;
 
     // ─────────────────────────────────────────
     //  INIT
@@ -82,11 +96,10 @@ public class PlayerMovement : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
         rb.freezeRotation = true;
-
-        // Buscamos el renderer en el hijo (la cápsula visual)
         meshRenderer = GetComponentInChildren<Renderer>();
 
-        // Creamos el TrailRenderer por código
+        dashUI = FindAnyObjectByType<DashCooldownUI>();
+
         SetupTrail();
     }
 
@@ -98,24 +111,23 @@ public class PlayerMovement : MonoBehaviour
         trail.endWidth = 0f;
         trail.material = new Material(Shader.Find("Sprites/Default"));
 
-        // Gradiente: rojo → transparente
         Gradient gradient = new Gradient();
         gradient.SetKeys(
             new GradientColorKey[] {
-                new GradientColorKey(Color.red, 0f),
+                new GradientColorKey(Color.red,    0f),
                 new GradientColorKey(Color.yellow, 1f)
             },
             new GradientAlphaKey[] {
                 new GradientAlphaKey(0.8f, 0f),
-                new GradientAlphaKey(0f, 1f)
+                new GradientAlphaKey(0f,   1f)
             }
         );
         trail.colorGradient = gradient;
-        trail.emitting = false; // Solo emite al dashear
+        trail.emitting = false;
     }
 
     // ─────────────────────────────────────────
-    //  INPUT CALLBACKS (Player Input - Send Messages)
+    //  INPUT CALLBACKS
     // ─────────────────────────────────────────
     public void OnMove(InputValue value) => moveInput = value.Get<Vector2>();
     public void OnJump(InputValue value) => jumpPressed = value.isPressed;
@@ -174,8 +186,16 @@ public class PlayerMovement : MonoBehaviour
 
     void ApplyExtraGravity()
     {
-        if (!isGrounded && rb.linearVelocity.y < 0)
-            rb.AddForce(Vector3.down * gravityMultiplier, ForceMode.Acceleration);
+        if (isGrounded)
+        {
+            currentGravity = 0f;
+            return;
+        }
+
+        currentGravity = Mathf.MoveTowards(
+            currentGravity, maxGravityMultiplier, gravityBuildSpeed * Time.deltaTime
+        );
+        rb.AddForce(Vector3.down * currentGravity, ForceMode.Acceleration);
     }
 
     // ─────────────────────────────────────────
@@ -190,14 +210,22 @@ public class PlayerMovement : MonoBehaviour
         camForward.y = 0f; camForward.Normalize();
         camRight.y = 0f; camRight.Normalize();
 
-        Vector3 moveDir = camForward * moveInput.y + camRight * moveInput.x;
+        // Separamos los inputs y aplicamos factores por dirección
+        float forwardInput = Mathf.Clamp(moveInput.y, -1f, 1f);
+        float sidewaysInput = Mathf.Clamp(moveInput.x, -1f, 1f);
+
+        float forwardFactor = forwardInput >= 0f ? 1f : backwardSpeedFactor;
+        float sidewaysFactor = sidewaysSpeedFactor;
+
+        Vector3 moveDir = camForward * (forwardInput * forwardFactor)
+                        + camRight * (sidewaysInput * sidewaysFactor);
+
         bool isMoving = moveDir.magnitude > 0.1f;
         bool isRunning = isMoving && Keyboard.current.leftShiftKey.isPressed;
 
         float targetSpeed = isMoving ? (isRunning ? runSpeed : walkSpeed) : 0f;
         float accel = isMoving ? acceleration : deceleration;
 
-        // Reducir control en el aire
         float controlFactor = isGrounded ? 1f : airControl;
         currentSpeed = Mathf.MoveTowards(
             currentSpeed, targetSpeed, accel * controlFactor * Time.fixedDeltaTime
@@ -223,9 +251,7 @@ public class PlayerMovement : MonoBehaviour
     void HandleDashInput()
     {
         if (dashPressed && dashCooldownTimer <= 0f)
-        {
             StartCoroutine(DashCoroutine());
-        }
         dashPressed = false;
     }
 
@@ -240,22 +266,20 @@ public class PlayerMovement : MonoBehaviour
         isDashing = true;
         dashCooldownTimer = dashCooldown;
 
-        // Dirección del dash: hacia donde mira la cámara (ignorando Y)
         Vector3 dashDir = cameraPivot != null ? cameraPivot.forward : transform.forward;
         dashDir.y = 0f;
         dashDir.Normalize();
 
-        // Aplicar velocidad del dash
         rb.linearVelocity = Vector3.zero;
         rb.AddForce(dashDir * dashForce, ForceMode.Impulse);
 
-        // Activar estela
+        if (dashUI != null) dashUI.OnDashUsed(dashCooldown);
+
         trail.emitting = true;
         SetColor(colorDash);
 
         yield return new WaitForSeconds(dashDuration);
 
-        // Frenar suavemente al terminar
         rb.linearVelocity = new Vector3(
             rb.linearVelocity.x * 0.3f,
             rb.linearVelocity.y,
@@ -288,7 +312,7 @@ public class PlayerMovement : MonoBehaviour
     }
 
     // ─────────────────────────────────────────
-    //  DEBUG (opcional, podés comentar esto)
+    //  DEBUG
     // ─────────────────────────────────────────
     void OnDrawGizmosSelected()
     {
