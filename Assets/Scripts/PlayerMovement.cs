@@ -83,11 +83,17 @@ public class PlayerMovement : MonoBehaviour
 
     private DashCooldownUI dashUI;
 
+    /*
     // Colores por estado
     private static readonly Color colorIdle = Color.green;
     private static readonly Color colorMove = Color.yellow;
     private static readonly Color colorSprint = Color.red;
     private static readonly Color colorDash = Color.red;
+    */
+
+    [Header("Animación")]
+    [SerializeField] private Animator animator;
+    
 
     // ─────────────────────────────────────────
     //  INIT
@@ -99,6 +105,9 @@ public class PlayerMovement : MonoBehaviour
         meshRenderer = GetComponentInChildren<Renderer>();
 
         dashUI = FindAnyObjectByType<DashCooldownUI>();
+
+        if (animator == null)
+            animator = GetComponentInChildren<Animator>();
 
         SetupTrail();
     }
@@ -146,7 +155,22 @@ public class PlayerMovement : MonoBehaviour
         ApplyExtraGravity();
         HandleDashInput();
         UpdateCooldown();
-        UpdateColor();
+        //UpdateColor();
+
+        void UpdateAnimations()
+        {
+            if (animator == null) return;
+
+            float speed = new Vector2(rb.linearVelocity.x, rb.linearVelocity.z).magnitude;
+            bool sprinting = Keyboard.current.leftShiftKey.isPressed;
+
+            animator.SetFloat("Speed", speed);
+            animator.SetBool("IsSprinting", sprinting && speed > 0.1f);
+            animator.SetBool("IsGrounded", isGrounded);
+            animator.SetBool("IsDashing", isDashing);
+        }
+
+        UpdateAnimations();
     }
 
     void FixedUpdate()
@@ -180,6 +204,7 @@ public class PlayerMovement : MonoBehaviour
             rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
             rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
             coyoteTimer = 0f;
+            animator.SetTrigger("Jump");
         }
         jumpPressed = false;
     }
@@ -276,7 +301,7 @@ public class PlayerMovement : MonoBehaviour
         if (dashUI != null) dashUI.OnDashUsed(dashCooldown);
 
         trail.emitting = true;
-        SetColor(colorDash);
+        //SetColor(colorDash);
 
         yield return new WaitForSeconds(dashDuration);
 
@@ -289,7 +314,7 @@ public class PlayerMovement : MonoBehaviour
         trail.emitting = false;
         isDashing = false;
     }
-
+    /*
     // ─────────────────────────────────────────
     //  COLORES
     // ─────────────────────────────────────────
@@ -310,7 +335,7 @@ public class PlayerMovement : MonoBehaviour
         if (meshRenderer != null)
             meshRenderer.material.color = color;
     }
-
+    */
     // ─────────────────────────────────────────
     //  DEBUG
     // ─────────────────────────────────────────
