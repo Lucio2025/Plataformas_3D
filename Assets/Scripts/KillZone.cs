@@ -11,5 +11,8 @@ public class KillZone : MonoBehaviour
         if (!other.CompareTag("Player")) return;
 
         CheckpointManager.Instance.RespawnPlayer(other.gameObject);
+
+        GravityFlipManager flip = other.GetComponent<GravityFlipManager>();
+        if (flip != null) flip.OnPlayerDied();
     }
 }

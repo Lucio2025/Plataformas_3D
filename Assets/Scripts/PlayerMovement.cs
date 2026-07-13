@@ -83,14 +83,6 @@ public class PlayerMovement : MonoBehaviour
 
     private DashCooldownUI dashUI;
 
-    /*
-    // Colores por estado
-    private static readonly Color colorIdle = Color.green;
-    private static readonly Color colorMove = Color.yellow;
-    private static readonly Color colorSprint = Color.red;
-    private static readonly Color colorDash = Color.red;
-    */
-
     [Header("Animación")]
     [SerializeField] private Animator animator;
     
@@ -314,28 +306,7 @@ public class PlayerMovement : MonoBehaviour
         trail.emitting = false;
         isDashing = false;
     }
-    /*
-    // ─────────────────────────────────────────
-    //  COLORES
-    // ─────────────────────────────────────────
-    void UpdateColor()
-    {
-        if (meshRenderer == null || isDashing) return;
 
-        bool isMoving = moveInput.magnitude > 0.1f;
-        bool isSprinting = Keyboard.current.leftShiftKey.isPressed;
-
-        if (!isMoving) SetColor(colorIdle);
-        else if (isSprinting) SetColor(colorSprint);
-        else SetColor(colorMove);
-    }
-
-    void SetColor(Color color)
-    {
-        if (meshRenderer != null)
-            meshRenderer.material.color = color;
-    }
-    */
     // ─────────────────────────────────────────
     //  DEBUG
     // ─────────────────────────────────────────
