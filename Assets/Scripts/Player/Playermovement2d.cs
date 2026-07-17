@@ -14,6 +14,8 @@ public class PlayerMovement2D : MonoBehaviour
     [SerializeField] private float dashDuration2D = 0.18f;
     [SerializeField] private float dashCooldown2D = 1.2f;
 
+    private float inputLockTimer = 0f;
+
     // Ground layer se copia automáticamente del PlayerMovement — no hace falta asignarlo
     private LayerMask groundLayer;
 
@@ -54,6 +56,12 @@ public class PlayerMovement2D : MonoBehaviour
 
         animator = GetComponentInChildren<Animator>();
         trail = GetComponent<TrailRenderer>();
+
+        inputAxis = 0f;
+        jumpPressed = false;
+        dashPressed = false;
+
+        inputLockTimer = 0.3f; // bloquea input por 0.3 segundos al entrar
 
         rb.linearVelocity = Vector3.zero;
         transform.rotation = Quaternion.LookRotation(-wallNormal);
@@ -139,6 +147,13 @@ public class PlayerMovement2D : MonoBehaviour
             if (animator != null) animator.SetTrigger("Jump");
         }
         jumpPressed = false;
+
+        if (inputLockTimer > 0f)
+        {
+            inputLockTimer -= Time.deltaTime;
+            inputAxis = 0f;
+            return; // no procesar nada más este frame
+        }
 
         UpdateAnimations();
     }

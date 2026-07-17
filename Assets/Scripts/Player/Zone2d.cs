@@ -45,6 +45,12 @@ public class Zone2D : MonoBehaviour
     {
         isIn2DMode = true;
 
+        foreach (BeeEnemy bee in FindObjectsByType<BeeEnemy>(FindObjectsSortMode.None))
+        {
+            if (GetComponent<Collider>().bounds.Contains(bee.transform.position))
+                bee.SetMode2D(true, Vector3.Cross(wallNormal, Vector3.up).normalized);
+        }
+
         // Leer el groundLayer del PlayerMovement original via reflexión
         // (porque es SerializeField privado)
         LayerMask groundLayer = GetGroundLayer(playerMovement);
@@ -73,6 +79,9 @@ public class Zone2D : MonoBehaviour
 
         if (cameraController != null)
             cameraController.ExitMode2D();
+
+        foreach (BeeEnemy bee in FindObjectsByType<BeeEnemy>(FindObjectsSortMode.None))
+            bee.SetMode2D(false, Vector3.zero);
     }
 
     // -----------------------------------------------------------------------
